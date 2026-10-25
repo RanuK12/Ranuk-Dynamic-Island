@@ -38,6 +38,17 @@ AVATAR_ICONS = {
     "default": "🤖"
 }
 
+def fix_mojibake(text: str) -> str:
+    """Fixes UTF-8 mojibake (e.g. Ã³ -> ó, vÃ¡lida -> válida)."""
+    if not text:
+        return ""
+    if "Ã" in text or "Â" in text or "â" in text:
+        try:
+            return text.encode("latin1").decode("utf-8")
+        except Exception:
+            pass
+    return text
+
 class MacBridge:
     def __init__(self, host: str = "192.168.1.34", user: str = "emilioranucoli", hub_url: str = "http://192.168.1.34:8788"):
         self.host = host
@@ -60,7 +71,15 @@ class MacBridge:
             kwargs = {}
             if sys.platform == "win32":
                 kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, **kwargs)
+            res = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                **kwargs
+            )
             return res.returncode, res.stdout.strip()
         except subprocess.TimeoutExpired:
             return -1, "Timeout"
@@ -83,10 +102,12 @@ class MacBridge:
                     icon = AVATAR_ICONS.get(sender, AVATAR_ICONS["default"])
                     ts = data.get("ts", "")
                     time_str = ts.split("T")[-1][:5] if "T" in ts else ts[-8:-3]
+                    raw_text = data.get("texto", "")
+                    clean_text = fix_mojibake(raw_text)
                     messages.append({
                         "sender": sender,
                         "dest": data.get("para") or data.get("destinatario") or "equipo",
-                        "text": data.get("texto", ""),
+                        "text": clean_text,
                         "time": time_str or "--:--",
                         "icon": icon
                     })
@@ -139,7 +160,16 @@ class MacBridge:
                 kwargs = {}
                 if sys.platform == "win32":
                     kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-                p = subprocess.run(cmd, input=python_script, text=True, capture_output=True, timeout=5, **kwargs)
+                p = subprocess.run(
+                    cmd,
+                    input=python_script,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    capture_output=True,
+                    timeout=5,
+                    **kwargs
+                )
                 if p.returncode == 0 and p.stdout.strip():
                     self.cached_crons = json.loads(p.stdout.strip())
                     self.last_crons_fetch = now.timestamp()

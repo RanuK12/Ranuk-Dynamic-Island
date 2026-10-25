@@ -9,6 +9,7 @@ import threading
 import time
 import webbrowser
 import subprocess
+import ctypes
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageOps
 import customtkinter as ctk
@@ -32,7 +33,7 @@ def load_config():
             "mac": {"host": "192.168.1.34", "user": "emilioranucoli", "hub_url": "http://192.168.1.34:8788"},
             "weather": {"city": "Buenos Aires, Argentina", "latitude": -34.6037, "longitude": -58.3816},
             "github": {"username": "RanuK12"},
-            "ui": {"collapsed_width": 340, "collapsed_height": 42, "expanded_width": 680, "expanded_height": 480}
+            "ui": {"collapsed_width": 330, "collapsed_height": 42, "expanded_width": 700, "expanded_height": 520}
         }
 
 def get_rounded_image(path, size, radius=8):
@@ -49,6 +50,25 @@ def get_rounded_image(path, size, radius=8):
     except Exception:
         return None
 
+def apply_apple_glass(hwnd):
+    """Enables native Windows 11 Acrylic / DWM Blur Behind."""
+    try:
+        top_hwnd = ctypes.windll.user32.GetParent(hwnd) or hwnd
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        DWMWA_WINDOW_CORNER_PREFERENCE = 33
+        DWMWA_SYSTEMBACKDROP_TYPE = 38
+        
+        dark = ctypes.c_int(1)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(top_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ctypes.byref(dark), ctypes.sizeof(dark))
+        
+        corner = ctypes.c_int(2) # Round
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(top_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ctypes.byref(corner), ctypes.sizeof(corner))
+        
+        backdrop = ctypes.c_int(3) # Acrylic frosted glass
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(top_hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ctypes.byref(backdrop), ctypes.sizeof(backdrop))
+    except Exception:
+        pass
+
 class DynamicIsland(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -64,10 +84,10 @@ class DynamicIsland(ctk.CTk):
         )
 
         # Dimensions
-        self.collapsed_w = self.config["ui"].get("collapsed_width", 340)
+        self.collapsed_w = self.config["ui"].get("collapsed_width", 330)
         self.collapsed_h = self.config["ui"].get("collapsed_height", 42)
-        self.expanded_w = self.config["ui"].get("expanded_width", 680)
-        self.expanded_h = self.config["ui"].get("expanded_height", 480)
+        self.expanded_w = self.config["ui"].get("expanded_width", 700)
+        self.expanded_h = self.config["ui"].get("expanded_height", 520)
 
         self.current_w = self.collapsed_w
         self.current_h = self.collapsed_h
@@ -81,21 +101,21 @@ class DynamicIsland(ctk.CTk):
         self.pomodoro_seconds = 25 * 60
         self.pomodoro_running = False
 
-        # Window styling: Frameless, Topmost, transparent outer margins
+        # Window styling: Frameless, Topmost, transparent outer margins, slight alpha for glass effect
         self.overrideredirect(True)
         self.attributes("-topmost", True)
+        self.attributes("-alpha", 0.96)
         self.configure(fg_color="#000001")
         self.wm_attributes("-transparentcolor", "#000001")
 
         self.screen_w = self.winfo_screenwidth()
         self.update_geometry(self.collapsed_w, self.collapsed_h)
 
-        # Load Assets
+        # Assets
         logo_path = os.path.join(ASSETS_DIR, "logo.png")
         banner_path = os.path.join(ASSETS_DIR, "banner.jpeg")
         self.img_logo_pill = get_rounded_image(logo_path, (22, 22), radius=6)
-        self.img_logo_large = get_rounded_image(logo_path, (44, 44), radius=10)
-        self.img_banner = get_rounded_image(banner_path, (610, 120), radius=10)
+        self.img_banner = get_rounded_image(banner_path, (640, 120), radius=10)
 
         # Dragging states
         self._is_dragging = False
@@ -108,10 +128,10 @@ class DynamicIsland(ctk.CTk):
         self.start_background_sync()
         self.start_clock_timer()
 
-        # Raise window
-        self.lift()
-        self.focus_force()
+        # Apply native Windows 11 Acrylic Glass
+        self.after(50, lambda: apply_apple_glass(self.winfo_id()))
         self.after(100, self.lift)
+        self.focus_force()
 
     def update_geometry(self, w, h):
         x = (self.screen_w - w) // 2
@@ -119,36 +139,40 @@ class DynamicIsland(ctk.CTk):
         self.geometry(f"{w}x{h}+{x}+{y}")
 
     def setup_ui(self):
-        # Master Island Frame (The pill)
+        # Master Island Frame (The Pill / Glass Container)
         self.island_frame = ctk.CTkFrame(
             self,
-            fg_color="#080b10",
-            border_color="#263040",
+            fg_color="#080c14",
+            border_color="#223048",
             border_width=1,
-            corner_radius=21
+            corner_radius=22
         )
         self.island_frame.pack(fill="both", expand=True, padx=2, pady=2)
 
-        # Top Pill Bar (Always visible)
+        # --- PILL BAR (Clean, perfectly balanced, never overflows) ---
         self.pill_bar = ctk.CTkFrame(self.island_frame, fg_color="transparent", height=38)
         self.pill_bar.pack(fill="x", padx=12, pady=(2, 2))
         
-        # Bind dragging & clicking on pill
         self.pill_bar.bind("<ButtonPress-1>", self.start_drag)
         self.pill_bar.bind("<B1-Motion>", self.do_drag)
         self.pill_bar.bind("<ButtonRelease-1>", self.end_drag)
 
-        # Ranuk Logo in Pill
+        # Left Group
+        left_grp = ctk.CTkFrame(self.pill_bar, fg_color="transparent")
+        left_grp.pack(side="left")
+        left_grp.bind("<ButtonPress-1>", self.start_drag)
+        left_grp.bind("<B1-Motion>", self.do_drag)
+        left_grp.bind("<ButtonRelease-1>", self.end_drag)
+
         if self.img_logo_pill:
-            self.lbl_pill_logo = ctk.CTkLabel(self.pill_bar, image=self.img_logo_pill, text="")
+            self.lbl_pill_logo = ctk.CTkLabel(left_grp, image=self.img_logo_pill, text="")
             self.lbl_pill_logo.pack(side="left", padx=(0, 6))
             self.lbl_pill_logo.bind("<ButtonPress-1>", self.start_drag)
             self.lbl_pill_logo.bind("<B1-Motion>", self.do_drag)
             self.lbl_pill_logo.bind("<ButtonRelease-1>", self.end_drag)
 
-        # Status Dot (Mac / Ranukita status)
         self.dot_label = ctk.CTkLabel(
-            self.pill_bar,
+            left_grp,
             text="●",
             text_color="#00e676",
             font=("Segoe UI", 15, "bold"),
@@ -159,10 +183,9 @@ class DynamicIsland(ctk.CTk):
         self.dot_label.bind("<B1-Motion>", self.do_drag)
         self.dot_label.bind("<ButtonRelease-1>", self.end_drag)
 
-        # Pill Title / Agent status ticker
         self.pill_title = ctk.CTkLabel(
-            self.pill_bar,
-            text="Ranuk IT Hub",
+            left_grp,
+            text="Ranuk Hub",
             text_color="#f0f6fc",
             font=("Segoe UI Variable Display", 12, "bold")
         )
@@ -171,9 +194,30 @@ class DynamicIsland(ctk.CTk):
         self.pill_title.bind("<B1-Motion>", self.do_drag)
         self.pill_title.bind("<ButtonRelease-1>", self.end_drag)
 
-        # Pill Clock (Right)
+        self.pill_badge = ctk.CTkLabel(
+            left_grp,
+            text="11 svcs",
+            font=("Segoe UI", 10, "bold"),
+            text_color="#58a6ff",
+            fg_color="#121e33",
+            corner_radius=4,
+            padx=6,
+            pady=1
+        )
+        self.pill_badge.pack(side="left", padx=(6, 0))
+        self.pill_badge.bind("<ButtonPress-1>", self.start_drag)
+        self.pill_badge.bind("<B1-Motion>", self.do_drag)
+        self.pill_badge.bind("<ButtonRelease-1>", self.end_drag)
+
+        # Right Group (Always visible, never pushed out)
+        right_grp = ctk.CTkFrame(self.pill_bar, fg_color="transparent")
+        right_grp.pack(side="right")
+        right_grp.bind("<ButtonPress-1>", self.start_drag)
+        right_grp.bind("<B1-Motion>", self.do_drag)
+        right_grp.bind("<ButtonRelease-1>", self.end_drag)
+
         self.pill_clock = ctk.CTkLabel(
-            self.pill_bar,
+            right_grp,
             text=datetime.now().strftime("%H:%M"),
             text_color="#8b949e",
             font=("Segoe UI Variable Display", 12, "bold")
@@ -183,19 +227,18 @@ class DynamicIsland(ctk.CTk):
         self.pill_clock.bind("<B1-Motion>", self.do_drag)
         self.pill_clock.bind("<ButtonRelease-1>", self.end_drag)
 
-        # Pill Weather
         self.pill_weather = ctk.CTkLabel(
-            self.pill_bar,
+            right_grp,
             text="⛅ --°",
             text_color="#e6edf3",
-            font=("Segoe UI", 12)
+            font=("Segoe UI", 12, "bold")
         )
-        self.pill_weather.pack(side="right", padx=(6, 6))
+        self.pill_weather.pack(side="right", padx=(0, 6))
         self.pill_weather.bind("<ButtonPress-1>", self.start_drag)
         self.pill_weather.bind("<B1-Motion>", self.do_drag)
         self.pill_weather.bind("<ButtonRelease-1>", self.end_drag)
 
-        # Dashboard Container (Hidden when collapsed)
+        # --- EXPANDED DASHBOARD CONTAINER ---
         self.dashboard_frame = ctk.CTkFrame(self.island_frame, fg_color="transparent")
 
         # Tab Selector Bar + Close button
@@ -217,8 +260,8 @@ class DynamicIsland(ctk.CTk):
                 self.nav_frame,
                 text=label,
                 font=("Segoe UI Variable Display", 11, "bold"),
-                fg_color="#131923" if key != "slack" else "#1f6feb",
-                hover_color="#233147",
+                fg_color="#121a28" if key != "slack" else "#1f6feb",
+                hover_color="#1f2c42",
                 text_color="#f0f6fc",
                 height=28,
                 corner_radius=8,
@@ -244,9 +287,9 @@ class DynamicIsland(ctk.CTk):
         # Content Card Holder (Glassmorphic)
         self.content_holder = ctk.CTkFrame(
             self.dashboard_frame,
-            fg_color="#101520",
+            fg_color="#0e1420",
             corner_radius=14,
-            border_color="#1c2536",
+            border_color="#1a2536",
             border_width=1
         )
         self.content_holder.pack(fill="both", expand=True, padx=6, pady=(0, 6))
@@ -283,7 +326,7 @@ class DynamicIsland(ctk.CTk):
             self.toggle_expand()
         self._is_dragging = False
 
-    # --- TAB VIEWS ---
+    # --- TAB BUILDERS ---
     def build_slack_view(self):
         f = ctk.CTkFrame(self.content_holder, fg_color="transparent")
 
@@ -296,7 +339,7 @@ class DynamicIsland(ctk.CTk):
         self.lbl_slack_count = ctk.CTkLabel(top_row, text="Sincronizando...", font=("Segoe UI", 11), text_color="#8b949e")
         self.lbl_slack_count.pack(side="right")
 
-        self.slack_scroll = ctk.CTkScrollableFrame(f, fg_color="#090d14", corner_radius=10, height=270)
+        self.slack_scroll = ctk.CTkScrollableFrame(f, fg_color="#090d16", corner_radius=10, height=310)
         self.slack_scroll.pack(fill="both", expand=True, pady=(0, 8))
 
         # Input Row to send directives
@@ -307,8 +350,8 @@ class DynamicIsland(ctk.CTk):
             input_row,
             placeholder_text="Enviar directiva o mensaje al equipo como CEO (Emilio)...",
             font=("Segoe UI", 11),
-            fg_color="#171e2c",
-            border_color="#2b384e",
+            fg_color="#141c2a",
+            border_color="#243248",
             height=32
         )
         self.entry_slack.pack(side="left", fill="x", expand=True, padx=(0, 6))
@@ -358,7 +401,7 @@ class DynamicIsland(ctk.CTk):
         btn_open_hub.pack(side="right")
 
         # Telemetry Card
-        card = ctk.CTkFrame(f, fg_color="#161f2e", corner_radius=10, border_color="#233147", border_width=1)
+        card = ctk.CTkFrame(f, fg_color="#131b28", corner_radius=10, border_color="#223048", border_width=1)
         card.pack(fill="x", pady=(0, 8))
 
         cl = ctk.CTkFrame(card, fg_color="transparent")
@@ -395,8 +438,8 @@ class DynamicIsland(ctk.CTk):
             bottom_row,
             text="💻 Consola SSH al Mac",
             font=("Segoe UI Variable Display", 11, "bold"),
-            fg_color="#283548",
-            hover_color="#384963",
+            fg_color="#222e42",
+            hover_color="#31435f",
             height=28,
             corner_radius=6,
             command=self.open_mac_ssh
@@ -417,7 +460,7 @@ class DynamicIsland(ctk.CTk):
         self.lbl_crons_summary = ctk.CTkLabel(top_row, text="Cargando crons...", font=("Segoe UI", 11), text_color="#8b949e")
         self.lbl_crons_summary.pack(side="right")
 
-        self.crons_scroll = ctk.CTkScrollableFrame(f, fg_color="#090d14", corner_radius=10, height=310)
+        self.crons_scroll = ctk.CTkScrollableFrame(f, fg_color="#090d16", corner_radius=10, height=350)
         self.crons_scroll.pack(fill="both", expand=True)
 
         return f
@@ -453,7 +496,7 @@ class DynamicIsland(ctk.CTk):
         )
         self.lbl_gh_bio.pack(fill="x", pady=(0, 8))
 
-        self.gh_repos_box = ctk.CTkScrollableFrame(f, fg_color="#090d14", corner_radius=10, height=270)
+        self.gh_repos_box = ctk.CTkScrollableFrame(f, fg_color="#090d16", corner_radius=10, height=310)
         self.gh_repos_box.pack(fill="both", expand=True)
 
         return f
@@ -468,20 +511,20 @@ class DynamicIsland(ctk.CTk):
         self.lbl_w_city = ctk.CTkLabel(loc_row, text="📍 Buenos Aires, Argentina", font=("Segoe UI Variable Display", 13, "bold"), text_color="#ffd166")
         self.lbl_w_city.pack(side="left")
 
-        # Current weather card
-        curr_card = ctk.CTkFrame(f, fg_color="#141c2a", corner_radius=10, border_color="#212c3f", border_width=1)
-        curr_card.pack(fill="x", pady=(0, 8))
+        # Current weather card (Apple Glass style)
+        curr_card = ctk.CTkFrame(f, fg_color="#121a28", corner_radius=12, border_color="#1f2c42", border_width=1)
+        curr_card.pack(fill="x", pady=(0, 10))
 
         c_layout = ctk.CTkFrame(curr_card, fg_color="transparent")
-        c_layout.pack(fill="x", padx=12, pady=10)
+        c_layout.pack(fill="x", padx=16, pady=12)
 
         left_c = ctk.CTkFrame(c_layout, fg_color="transparent")
         left_c.pack(side="left")
 
-        self.lbl_w_big = ctk.CTkLabel(left_c, text="⛅ --°C", font=("Segoe UI Variable Display", 34, "bold"), text_color="#ffd166")
+        self.lbl_w_big = ctk.CTkLabel(left_c, text="⛅ --°C", font=("Segoe UI Variable Display", 36, "bold"), text_color="#ffd166")
         self.lbl_w_big.pack(anchor="w")
 
-        self.lbl_w_desc = ctk.CTkLabel(left_c, text="Cargando pronóstico...", font=("Segoe UI", 13, "bold"), text_color="#f0f6fc")
+        self.lbl_w_desc = ctk.CTkLabel(left_c, text="Cargando pronóstico...", font=("Segoe UI Variable Display", 13, "bold"), text_color="#f0f6fc")
         self.lbl_w_desc.pack(anchor="w")
 
         right_c = ctk.CTkFrame(c_layout, fg_color="transparent")
@@ -496,20 +539,23 @@ class DynamicIsland(ctk.CTk):
         )
         self.lbl_w_detail.pack(anchor="e")
 
-        # 5-Day Forecast Section Header
-        lbl_fc_head = ctk.CTkLabel(f, text="📅 Pronóstico para los Próximos Días:", font=("Segoe UI Variable Display", 12, "bold"), text_color="#e6edf3", anchor="w")
-        lbl_fc_head.pack(fill="x", pady=(4, 4))
+        # 5-Day Forecast Header
+        lbl_fc_head = ctk.CTkLabel(f, text="📅 Pronóstico para los Próximos 5 Días:", font=("Segoe UI Variable Display", 12, "bold"), text_color="#e6edf3", anchor="w")
+        lbl_fc_head.pack(fill="x", pady=(4, 6))
 
-        self.forecast_box = ctk.CTkScrollableFrame(f, fg_color="#090d14", corner_radius=10, height=160, orientation="horizontal")
-        self.forecast_box.pack(fill="x", expand=True)
+        # Uniform 5-Card Container (NO scrollbar, perfectly symmetrical and aligned)
+        self.forecast_grid = ctk.CTkFrame(f, fg_color="transparent")
+        self.forecast_grid.pack(fill="x", expand=False)
+        for col_idx in range(5):
+            self.forecast_grid.columnconfigure(col_idx, weight=1, uniform="forecast_col")
 
         return f
 
     def build_focus_view(self):
         f = ctk.CTkFrame(self.content_holder, fg_color="transparent")
 
-        self.lbl_pomo = ctk.CTkLabel(f, text="25:00", font=("Segoe UI Variable Display", 46, "bold"), text_color="#00d2ff")
-        self.lbl_pomo.pack(pady=(20, 16))
+        self.lbl_pomo = ctk.CTkLabel(f, text="25:00", font=("Segoe UI Variable Display", 48, "bold"), text_color="#00d2ff")
+        self.lbl_pomo.pack(pady=(24, 16))
 
         btn_row = ctk.CTkFrame(f, fg_color="transparent")
         btn_row.pack()
@@ -547,7 +593,7 @@ class DynamicIsland(ctk.CTk):
         if key == self.current_tab:
             return
         self.tab_views[self.current_tab].pack_forget()
-        self.tab_buttons[self.current_tab].configure(fg_color="#131923")
+        self.tab_buttons[self.current_tab].configure(fg_color="#121a28")
         
         self.tab_views[key].pack(fill="both", expand=True, padx=12, pady=12)
         self.tab_buttons[key].configure(fg_color="#1f6feb")
@@ -650,6 +696,8 @@ class DynamicIsland(ctk.CTk):
 
             # Services
             services = data.get("services", [])
+            svc_count = len(services)
+            self.pill_badge.configure(text=f"{svc_count} svcs" if svc_count > 0 else "activo")
             if services:
                 self.lbl_svcs_list.configure(text="\n".join([f"🟢 {s}" for s in services[:8]]))
             else:
@@ -660,20 +708,13 @@ class DynamicIsland(ctk.CTk):
             self.lbl_slack_count.configure(text=f"{len(slack_msgs)} directivas recientes")
             self.render_slack_messages(slack_msgs)
 
-            # Update Pill title with last active agent
-            if slack_msgs:
-                last_m = slack_msgs[0]
-                self.pill_title.configure(text=f"{last_m['icon']} {last_m['sender']}: {last_m['text'][:24]}...")
-            else:
-                self.pill_title.configure(text=f"Ranukita ({len(services)} svcs)")
-
             # Crons & Agenda
             crons = data.get("crons", [])
             self.render_crons_agenda(crons)
 
         else:
             self.dot_label.configure(text_color="#f85149")
-            self.pill_title.configure(text="Mac Desconectado")
+            self.pill_badge.configure(text="offline")
 
     def render_slack_messages(self, messages):
         for child in self.slack_scroll.winfo_children():
@@ -685,11 +726,11 @@ class DynamicIsland(ctk.CTk):
             return
 
         for m in messages:
-            row = ctk.CTkFrame(self.slack_scroll, fg_color="#121824", corner_radius=8, border_color="#1c2536", border_width=1)
+            row = ctk.CTkFrame(self.slack_scroll, fg_color="#111824", corner_radius=8, border_color="#1c2638", border_width=1)
             row.pack(fill="x", pady=3, padx=2)
 
             top = ctk.CTkFrame(row, fg_color="transparent")
-            top.pack(fill="x", padx=8, pady=(4, 2))
+            top.pack(fill="x", padx=10, pady=(6, 2))
 
             sender_txt = f"{m.get('icon', '🤖')} {m.get('sender', 'agente')} ➔ {m.get('dest', 'equipo')}"
             lbl_sender = ctk.CTkLabel(top, text=sender_txt, font=("Segoe UI Variable Display", 11, "bold"), text_color="#58a6ff")
@@ -698,8 +739,8 @@ class DynamicIsland(ctk.CTk):
             lbl_time = ctk.CTkLabel(top, text=m.get("time", ""), font=("Segoe UI", 10), text_color="#8b949e")
             lbl_time.pack(side="right")
 
-            lbl_msg = ctk.CTkLabel(row, text=m.get("text", ""), font=("Segoe UI", 11), text_color="#f0f6fc", justify="left", wraplength=580)
-            lbl_msg.pack(fill="x", padx=8, pady=(0, 6), anchor="w")
+            lbl_msg = ctk.CTkLabel(row, text=m.get("text", ""), font=("Segoe UI", 11), text_color="#f0f6fc", justify="left", wraplength=600)
+            lbl_msg.pack(fill="x", padx=10, pady=(0, 8), anchor="w")
 
     def render_crons_agenda(self, crons):
         for child in self.crons_scroll.winfo_children():
@@ -710,7 +751,6 @@ class DynamicIsland(ctk.CTk):
             lbl_empty.pack(pady=10)
             return
 
-        now_str = datetime.now().strftime("%H:%M")
         done_count = sum(1 for c in crons if c.get("done"))
         pending_count = len(crons) - done_count
         self.lbl_crons_summary.configure(text=f"{done_count} ejecutados | {pending_count} pendientes hoy")
@@ -723,7 +763,7 @@ class DynamicIsland(ctk.CTk):
                 break
 
         for c in crons:
-            row = ctk.CTkFrame(self.crons_scroll, fg_color="#121824" if c != next_cron else "#182b20", corner_radius=6)
+            row = ctk.CTkFrame(self.crons_scroll, fg_color="#111824" if c != next_cron else "#16281e", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
 
             is_done = c.get("done")
@@ -752,7 +792,7 @@ class DynamicIsland(ctk.CTk):
         repos = data.get("repos", [])
         if repos:
             for r in repos:
-                card = ctk.CTkFrame(self.gh_repos_box, fg_color="#121824", corner_radius=8, border_color="#1c2536", border_width=1)
+                card = ctk.CTkFrame(self.gh_repos_box, fg_color="#111824", corner_radius=8, border_color="#1c2638", border_width=1)
                 card.pack(fill="x", pady=3, padx=2)
 
                 top = ctk.CTkFrame(card, fg_color="transparent")
@@ -768,8 +808,8 @@ class DynamicIsland(ctk.CTk):
                     card,
                     text="Abrir Repositorio ↗",
                     font=("Segoe UI Variable Display", 10, "bold"),
-                    fg_color="#1e2736",
-                    hover_color="#2b384e",
+                    fg_color="#1c2636",
+                    hover_color="#28374d",
                     height=22,
                     corner_radius=4,
                     command=lambda u=r.get("url", "https://github.com/RanuK12"): webbrowser.open(u)
@@ -795,36 +835,66 @@ class DynamicIsland(ctk.CTk):
                  f"Viento: {data.get('wind', '--')} km/h | Índice UV: {data.get('uv', '--')}"
         )
 
-        # Render 5-day forecast cards
-        for child in self.forecast_box.winfo_children():
+        # Clear and build perfectly uniform 5-column forecast cards
+        for child in self.forecast_grid.winfo_children():
             child.destroy()
 
-        for day in data.get("forecast", []):
-            card = ctk.CTkFrame(self.forecast_box, fg_color="#141c2a", corner_radius=8, width=110, border_color="#212c3f", border_width=1)
-            card.pack(side="left", padx=4, pady=2, fill="y")
+        for idx, day in enumerate(data.get("forecast", [])[:5]):
+            card = ctk.CTkFrame(
+                self.forecast_grid,
+                fg_color="#121a28",
+                corner_radius=10,
+                border_color="#1f2c42",
+                border_width=1,
+                height=130
+            )
+            card.grid(row=0, column=idx, padx=4, sticky="nsew")
 
-            lbl_day = ctk.CTkLabel(card, text=day.get("day", ""), font=("Segoe UI Variable Display", 11, "bold"), text_color="#58a6ff")
-            lbl_day.pack(pady=(6, 2))
+            # Day label (Fixed height for uniform vertical layout)
+            lbl_day = ctk.CTkLabel(
+                card,
+                text=day.get("day", ""),
+                font=("Segoe UI Variable Display", 11, "bold"),
+                text_color="#58a6ff",
+                height=22
+            )
+            lbl_day.pack(fill="x", pady=(8, 2))
 
-            lbl_ico = ctk.CTkLabel(card, text=day.get("icon", "⛅"), font=("Segoe UI", 24))
-            lbl_ico.pack(pady=(0, 2))
+            # Icon label (Fixed height = 36 to ensure equal spacing regardless of icon)
+            lbl_ico = ctk.CTkLabel(
+                card,
+                text=day.get("icon", "⛅"),
+                font=("Segoe UI", 24),
+                height=36
+            )
+            lbl_ico.pack(fill="x", pady=2)
 
+            # Temp label (Fixed height)
             lbl_temps = ctk.CTkLabel(
                 card,
                 text=f"{day.get('max')}° / {day.get('min')}°",
                 font=("Segoe UI", 11, "bold"),
-                text_color="#f0f6fc"
+                text_color="#f0f6fc",
+                height=20
             )
-            lbl_temps.pack(pady=(0, 2))
+            lbl_temps.pack(fill="x", pady=(0, 4))
 
+            # Rain badge (Fixed height)
             rain_p = day.get("rain_prob", 0)
+            rain_bg = "#182a40" if rain_p > 20 else "#141c28"
+            rain_col = "#58a6ff" if rain_p > 20 else "#8b949e"
+            
             lbl_rain = ctk.CTkLabel(
                 card,
                 text=f"💧 {rain_p}%",
-                font=("Segoe UI", 10),
-                text_color="#388bfd" if rain_p > 20 else "#8b949e"
+                font=("Segoe UI", 10, "bold"),
+                text_color=rain_col,
+                fg_color=rain_bg,
+                corner_radius=6,
+                height=20,
+                padx=6
             )
-            lbl_rain.pack(pady=(0, 6))
+            lbl_rain.pack(pady=(0, 8))
 
     # --- FOCUS ACTIONS ---
     def toggle_pomodoro(self):
