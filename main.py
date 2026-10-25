@@ -51,9 +51,25 @@ def get_rounded_image(path, size, radius=8):
         return None
 
 def apply_apple_glass(hwnd):
-    """Enables native Windows 11 Acrylic / DWM Blur Behind."""
+    """Enables native Windows 11 Acrylic / DWM Blur Behind and hides window from taskbar."""
     try:
         top_hwnd = ctypes.windll.user32.GetParent(hwnd) or hwnd
+        
+        # 1. Hide completely from Windows Taskbar & Alt+Tab (Widget / Tool Window mode)
+        GWL_EXSTYLE = -20
+        WS_EX_TOOLWINDOW = 0x00000080
+        WS_EX_APPWINDOW = 0x00040000
+        style = ctypes.windll.user32.GetWindowLongW(top_hwnd, GWL_EXSTYLE)
+        style = (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW
+        ctypes.windll.user32.SetWindowLongW(top_hwnd, GWL_EXSTYLE, style)
+        
+        SWP_NOMOVE = 0x0002
+        SWP_NOSIZE = 0x0001
+        SWP_NOZORDER = 0x0004
+        SWP_FRAMECHANGED = 0x0020
+        ctypes.windll.user32.SetWindowPos(top_hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
+
+        # 2. Native Windows 11 DWM Acrylic Blur Behind & Rounded Corners
         DWMWA_USE_IMMERSIVE_DARK_MODE = 20
         DWMWA_WINDOW_CORNER_PREFERENCE = 33
         DWMWA_SYSTEMBACKDROP_TYPE = 38
@@ -107,6 +123,12 @@ class DynamicIsland(ctk.CTk):
         self.attributes("-alpha", 0.96)
         self.configure(fg_color="#000001")
         self.wm_attributes("-transparentcolor", "#000001")
+        try:
+            ico_file = os.path.join(ASSETS_DIR, "icon.ico")
+            if os.path.exists(ico_file):
+                self.iconbitmap(ico_file)
+        except Exception:
+            pass
 
         self.screen_w = self.winfo_screenwidth()
         self.update_geometry(self.collapsed_w, self.collapsed_h)
