@@ -1,5 +1,5 @@
 """
-Ranuk Dynamic Island — Mini Oficina Pro (Apple Glassmorphism Edition)
+Ranuk Dynamic Island — Mini Oficina Pro (Pure Black OLED Edition)
 Developed for Emilio Ranucoli / Ranuk IT Solutions (ranuk.dev)
 """
 import sys
@@ -11,7 +11,7 @@ import webbrowser
 import subprocess
 import ctypes
 from datetime import datetime
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw
 import customtkinter as ctk
 
 from mac_bridge import MacBridge
@@ -31,12 +31,12 @@ def load_config():
     except Exception:
         return {
             "mac": {"host": "192.168.1.34", "user": "emilioranucoli", "hub_url": "http://192.168.1.34:8788"},
-            "weather": {"city": "Buenos Aires, Argentina", "latitude": -34.6037, "longitude": -58.3816},
+            "weather": {"city": "James Craik, Córdoba", "latitude": -32.16145, "longitude": -63.4679},
             "github": {"username": "RanuK12"},
-            "ui": {"collapsed_width": 330, "collapsed_height": 42, "expanded_width": 700, "expanded_height": 520}
+            "ui": {"collapsed_width": 320, "collapsed_height": 38, "expanded_width": 700, "expanded_height": 520}
         }
 
-def get_rounded_image(path, size, radius=8):
+def get_rounded_image(path, size, radius=6):
     try:
         if not os.path.exists(path):
             return None
@@ -50,12 +50,10 @@ def get_rounded_image(path, size, radius=8):
     except Exception:
         return None
 
-def apply_apple_glass(hwnd):
-    """Enables native Windows 11 Acrylic / DWM Blur Behind and hides window from taskbar."""
+def apply_taskbar_hide(hwnd):
+    """Hides the window from Windows Taskbar and Alt+Tab cleanly without creating backdrop artifacts."""
     try:
         top_hwnd = ctypes.windll.user32.GetParent(hwnd) or hwnd
-        
-        # 1. Hide completely from Windows Taskbar & Alt+Tab (Widget / Tool Window mode)
         GWL_EXSTYLE = -20
         WS_EX_TOOLWINDOW = 0x00000080
         WS_EX_APPWINDOW = 0x00040000
@@ -68,20 +66,6 @@ def apply_apple_glass(hwnd):
         SWP_NOZORDER = 0x0004
         SWP_FRAMECHANGED = 0x0020
         ctypes.windll.user32.SetWindowPos(top_hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
-
-        # 2. Native Windows 11 DWM Acrylic Blur Behind & Rounded Corners
-        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
-        DWMWA_WINDOW_CORNER_PREFERENCE = 33
-        DWMWA_SYSTEMBACKDROP_TYPE = 38
-        
-        dark = ctypes.c_int(1)
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(top_hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ctypes.byref(dark), ctypes.sizeof(dark))
-        
-        corner = ctypes.c_int(2) # Round
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(top_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ctypes.byref(corner), ctypes.sizeof(corner))
-        
-        backdrop = ctypes.c_int(3) # Acrylic frosted glass
-        ctypes.windll.dwmapi.DwmSetWindowAttribute(top_hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ctypes.byref(backdrop), ctypes.sizeof(backdrop))
     except Exception:
         pass
 
@@ -100,15 +84,12 @@ class DynamicIsland(ctk.CTk):
         )
 
         # Dimensions
-        self.collapsed_w = self.config["ui"].get("collapsed_width", 330)
-        self.collapsed_h = self.config["ui"].get("collapsed_height", 42)
+        self.collapsed_w = self.config["ui"].get("collapsed_width", 320)
+        self.collapsed_h = self.config["ui"].get("collapsed_height", 38)
         self.expanded_w = self.config["ui"].get("expanded_width", 700)
         self.expanded_h = self.config["ui"].get("expanded_height", 520)
 
-        self.current_w = self.collapsed_w
-        self.current_h = self.collapsed_h
         self.is_expanded = False
-        self.is_animating = False
 
         # States
         self.mac_data = {"connected": False, "bot_running": False, "services": [], "slack_messages": [], "crons": [], "hub": {}}
@@ -117,12 +98,12 @@ class DynamicIsland(ctk.CTk):
         self.pomodoro_seconds = 25 * 60
         self.pomodoro_running = False
 
-        # Window styling: Frameless, Topmost, transparent outer margins, slight alpha for glass effect
+        # Window styling: Frameless, Topmost, transparent margin (No alpha to avoid gray border!)
         self.overrideredirect(True)
         self.attributes("-topmost", True)
-        self.attributes("-alpha", 0.96)
         self.configure(fg_color="#000001")
         self.wm_attributes("-transparentcolor", "#000001")
+
         try:
             ico_file = os.path.join(ASSETS_DIR, "icon.ico")
             if os.path.exists(ico_file):
@@ -136,8 +117,8 @@ class DynamicIsland(ctk.CTk):
         # Assets
         logo_path = os.path.join(ASSETS_DIR, "logo.png")
         banner_path = os.path.join(ASSETS_DIR, "banner.jpeg")
-        self.img_logo_pill = get_rounded_image(logo_path, (22, 22), radius=6)
-        self.img_banner = get_rounded_image(banner_path, (640, 120), radius=10)
+        self.img_logo_pill = get_rounded_image(logo_path, (20, 20), radius=5)
+        self.img_banner = get_rounded_image(banner_path, (640, 115), radius=10)
 
         # Dragging states
         self._is_dragging = False
@@ -150,30 +131,29 @@ class DynamicIsland(ctk.CTk):
         self.start_background_sync()
         self.start_clock_timer()
 
-        # Apply native Windows 11 Acrylic Glass
-        self.after(50, lambda: apply_apple_glass(self.winfo_id()))
-        self.after(100, self.lift)
+        # Hide from taskbar and bring front
+        self.after(20, lambda: apply_taskbar_hide(self.winfo_id()))
+        self.after(50, self.lift)
         self.focus_force()
 
     def update_geometry(self, w, h):
         x = (self.screen_w - w) // 2
-        y = 8
+        y = 6
         self.geometry(f"{w}x{h}+{x}+{y}")
 
     def setup_ui(self):
-        # Master Island Frame (The Pill / Glass Container)
+        # Master Island Frame — Pure OLED Black, NO gray border, seamless edges
         self.island_frame = ctk.CTkFrame(
             self,
-            fg_color="#080c14",
-            border_color="#223048",
-            border_width=1,
-            corner_radius=22
+            fg_color="#000000",
+            border_width=0,
+            corner_radius=19
         )
-        self.island_frame.pack(fill="both", expand=True, padx=2, pady=2)
+        self.island_frame.pack(fill="both", expand=True)
 
-        # --- PILL BAR (Clean, perfectly balanced, never overflows) ---
+        # --- PILL BAR ---
         self.pill_bar = ctk.CTkFrame(self.island_frame, fg_color="transparent", height=38)
-        self.pill_bar.pack(fill="x", padx=12, pady=(2, 2))
+        self.pill_bar.pack(fill="x", padx=12, pady=0)
         
         self.pill_bar.bind("<ButtonPress-1>", self.start_drag)
         self.pill_bar.bind("<B1-Motion>", self.do_drag)
@@ -208,7 +188,7 @@ class DynamicIsland(ctk.CTk):
         self.pill_title = ctk.CTkLabel(
             left_grp,
             text="Ranuk Hub",
-            text_color="#f0f6fc",
+            text_color="#ffffff",
             font=("Segoe UI Variable Display", 12, "bold")
         )
         self.pill_title.pack(side="left")
@@ -221,7 +201,7 @@ class DynamicIsland(ctk.CTk):
             text="11 svcs",
             font=("Segoe UI", 10, "bold"),
             text_color="#58a6ff",
-            fg_color="#121e33",
+            fg_color="#121824",
             corner_radius=4,
             padx=6,
             pady=1
@@ -231,7 +211,7 @@ class DynamicIsland(ctk.CTk):
         self.pill_badge.bind("<B1-Motion>", self.do_drag)
         self.pill_badge.bind("<ButtonRelease-1>", self.end_drag)
 
-        # Right Group (Always visible, never pushed out)
+        # Right Group (Always visible, clean, never overflowing)
         right_grp = ctk.CTkFrame(self.pill_bar, fg_color="transparent")
         right_grp.pack(side="right")
         right_grp.bind("<ButtonPress-1>", self.start_drag)
@@ -251,8 +231,8 @@ class DynamicIsland(ctk.CTk):
 
         self.pill_weather = ctk.CTkLabel(
             right_grp,
-            text="⛅ --°",
-            text_color="#e6edf3",
+            text="⛅ 19°",
+            text_color="#ffffff",
             font=("Segoe UI", 12, "bold")
         )
         self.pill_weather.pack(side="right", padx=(0, 6))
@@ -282,8 +262,8 @@ class DynamicIsland(ctk.CTk):
                 self.nav_frame,
                 text=label,
                 font=("Segoe UI Variable Display", 11, "bold"),
-                fg_color="#121a28" if key != "slack" else "#1f6feb",
-                hover_color="#1f2c42",
+                fg_color="#121824" if key != "slack" else "#1f6feb",
+                hover_color="#1d2638",
                 text_color="#f0f6fc",
                 height=28,
                 corner_radius=8,
@@ -296,22 +276,22 @@ class DynamicIsland(ctk.CTk):
             self.nav_frame,
             text="✕",
             font=("Segoe UI", 11, "bold"),
-            fg_color="#361a1a",
-            hover_color="#732222",
+            fg_color="#2b1414",
+            hover_color="#541b1b",
             text_color="#ff7b72",
             width=28,
             height=28,
             corner_radius=8,
-            command=self.destroy
+            command=self.toggle_expand
         )
         btn_close.pack(side="right", padx=(4, 0))
 
-        # Content Card Holder (Glassmorphic)
+        # Content Card Holder (Dark Glass)
         self.content_holder = ctk.CTkFrame(
             self.dashboard_frame,
-            fg_color="#0e1420",
+            fg_color="#0d111a",
             corner_radius=14,
-            border_color="#1a2536",
+            border_color="#1a2332",
             border_width=1
         )
         self.content_holder.pack(fill="both", expand=True, padx=6, pady=(0, 6))
@@ -348,6 +328,22 @@ class DynamicIsland(ctk.CTk):
             self.toggle_expand()
         self._is_dragging = False
 
+    # --- FAST SNAPPY EXPAND / COLLAPSE (Zero Lag) ---
+    def toggle_expand(self):
+        curr_x = self.winfo_x()
+        curr_y = self.winfo_y()
+
+        if not self.is_expanded:
+            # Expand Snappily
+            self.geometry(f"{self.expanded_w}x{self.expanded_h}+{curr_x}+{curr_y}")
+            self.dashboard_frame.pack(fill="both", expand=True, padx=6, pady=(4, 6))
+            self.is_expanded = True
+        else:
+            # Collapse Snappily
+            self.dashboard_frame.pack_forget()
+            self.geometry(f"{self.collapsed_w}x{self.collapsed_h}+{curr_x}+{curr_y}")
+            self.is_expanded = False
+
     # --- TAB BUILDERS ---
     def build_slack_view(self):
         f = ctk.CTkFrame(self.content_holder, fg_color="transparent")
@@ -361,7 +357,7 @@ class DynamicIsland(ctk.CTk):
         self.lbl_slack_count = ctk.CTkLabel(top_row, text="Sincronizando...", font=("Segoe UI", 11), text_color="#8b949e")
         self.lbl_slack_count.pack(side="right")
 
-        self.slack_scroll = ctk.CTkScrollableFrame(f, fg_color="#090d16", corner_radius=10, height=310)
+        self.slack_scroll = ctk.CTkScrollableFrame(f, fg_color="#070a0f", corner_radius=10, height=310)
         self.slack_scroll.pack(fill="both", expand=True, pady=(0, 8))
 
         # Input Row to send directives
@@ -372,8 +368,8 @@ class DynamicIsland(ctk.CTk):
             input_row,
             placeholder_text="Enviar directiva o mensaje al equipo como CEO (Emilio)...",
             font=("Segoe UI", 11),
-            fg_color="#141c2a",
-            border_color="#243248",
+            fg_color="#121824",
+            border_color="#1f2c40",
             height=32
         )
         self.entry_slack.pack(side="left", fill="x", expand=True, padx=(0, 6))
@@ -423,7 +419,7 @@ class DynamicIsland(ctk.CTk):
         btn_open_hub.pack(side="right")
 
         # Telemetry Card
-        card = ctk.CTkFrame(f, fg_color="#131b28", corner_radius=10, border_color="#223048", border_width=1)
+        card = ctk.CTkFrame(f, fg_color="#121824", corner_radius=10, border_color="#1d283a", border_width=1)
         card.pack(fill="x", pady=(0, 8))
 
         cl = ctk.CTkFrame(card, fg_color="transparent")
@@ -460,8 +456,8 @@ class DynamicIsland(ctk.CTk):
             bottom_row,
             text="💻 Consola SSH al Mac",
             font=("Segoe UI Variable Display", 11, "bold"),
-            fg_color="#222e42",
-            hover_color="#31435f",
+            fg_color="#1f2c40",
+            hover_color="#2d3f5c",
             height=28,
             corner_radius=6,
             command=self.open_mac_ssh
@@ -482,7 +478,7 @@ class DynamicIsland(ctk.CTk):
         self.lbl_crons_summary = ctk.CTkLabel(top_row, text="Cargando crons...", font=("Segoe UI", 11), text_color="#8b949e")
         self.lbl_crons_summary.pack(side="right")
 
-        self.crons_scroll = ctk.CTkScrollableFrame(f, fg_color="#090d16", corner_radius=10, height=350)
+        self.crons_scroll = ctk.CTkScrollableFrame(f, fg_color="#070a0f", corner_radius=10, height=350)
         self.crons_scroll.pack(fill="both", expand=True)
 
         return f
@@ -518,7 +514,7 @@ class DynamicIsland(ctk.CTk):
         )
         self.lbl_gh_bio.pack(fill="x", pady=(0, 8))
 
-        self.gh_repos_box = ctk.CTkScrollableFrame(f, fg_color="#090d16", corner_radius=10, height=310)
+        self.gh_repos_box = ctk.CTkScrollableFrame(f, fg_color="#070a0f", corner_radius=10, height=310)
         self.gh_repos_box.pack(fill="both", expand=True)
 
         return f
@@ -526,15 +522,15 @@ class DynamicIsland(ctk.CTk):
     def build_weather_view(self):
         f = ctk.CTkFrame(self.content_holder, fg_color="transparent")
         
-        # Location header
+        # Location header — Shows exact location
         loc_row = ctk.CTkFrame(f, fg_color="transparent")
         loc_row.pack(fill="x", pady=(0, 6))
 
-        self.lbl_w_city = ctk.CTkLabel(loc_row, text="📍 Buenos Aires, Argentina", font=("Segoe UI Variable Display", 13, "bold"), text_color="#ffd166")
+        self.lbl_w_city = ctk.CTkLabel(loc_row, text="📍 James Craik, Córdoba", font=("Segoe UI Variable Display", 13, "bold"), text_color="#ffd166")
         self.lbl_w_city.pack(side="left")
 
-        # Current weather card (Apple Glass style)
-        curr_card = ctk.CTkFrame(f, fg_color="#121a28", corner_radius=12, border_color="#1f2c42", border_width=1)
+        # Current weather card
+        curr_card = ctk.CTkFrame(f, fg_color="#121824", corner_radius=12, border_color="#1d283a", border_width=1)
         curr_card.pack(fill="x", pady=(0, 10))
 
         c_layout = ctk.CTkFrame(curr_card, fg_color="transparent")
@@ -543,10 +539,10 @@ class DynamicIsland(ctk.CTk):
         left_c = ctk.CTkFrame(c_layout, fg_color="transparent")
         left_c.pack(side="left")
 
-        self.lbl_w_big = ctk.CTkLabel(left_c, text="⛅ --°C", font=("Segoe UI Variable Display", 36, "bold"), text_color="#ffd166")
+        self.lbl_w_big = ctk.CTkLabel(left_c, text="⛅ 19°C", font=("Segoe UI Variable Display", 36, "bold"), text_color="#ffd166")
         self.lbl_w_big.pack(anchor="w")
 
-        self.lbl_w_desc = ctk.CTkLabel(left_c, text="Cargando pronóstico...", font=("Segoe UI Variable Display", 13, "bold"), text_color="#f0f6fc")
+        self.lbl_w_desc = ctk.CTkLabel(left_c, text="Mayormente despejado", font=("Segoe UI Variable Display", 13, "bold"), text_color="#f0f6fc")
         self.lbl_w_desc.pack(anchor="w")
 
         right_c = ctk.CTkFrame(c_layout, fg_color="transparent")
@@ -554,7 +550,7 @@ class DynamicIsland(ctk.CTk):
 
         self.lbl_w_detail = ctk.CTkLabel(
             right_c,
-            text="Sensación: --° | Humedad: --%\nViento: -- km/h | Índice UV: --",
+            text="Sensación: 19° | Humedad: 48%\nViento: 15 km/h | Índice UV: 7",
             font=("Segoe UI", 11),
             text_color="#8b949e",
             justify="right"
@@ -615,44 +611,11 @@ class DynamicIsland(ctk.CTk):
         if key == self.current_tab:
             return
         self.tab_views[self.current_tab].pack_forget()
-        self.tab_buttons[self.current_tab].configure(fg_color="#121a28")
+        self.tab_buttons[self.current_tab].configure(fg_color="#121824")
         
         self.tab_views[key].pack(fill="both", expand=True, padx=12, pady=12)
         self.tab_buttons[key].configure(fg_color="#1f6feb")
         self.current_tab = key
-
-    # --- EXPAND / COLLAPSE ANIMATION ---
-    def toggle_expand(self):
-        self.is_animating = True
-        target_w = self.collapsed_w if self.is_expanded else self.expanded_w
-        target_h = self.collapsed_h if self.is_expanded else self.expanded_h
-
-        if not self.is_expanded:
-            self.dashboard_frame.pack(fill="both", expand=True, padx=6, pady=(4, 6))
-
-        steps = 6
-        dw = (target_w - self.current_w) / steps
-        dh = (target_h - self.current_h) / steps
-
-        curr_x = self.winfo_x()
-        curr_y = self.winfo_y()
-
-        def step(count=0):
-            if count < steps:
-                self.current_w += dw
-                self.current_h += dh
-                self.geometry(f"{int(self.current_w)}x{int(self.current_h)}+{curr_x}+{curr_y}")
-                self.after(16, lambda: step(count + 1))
-            else:
-                self.current_w = target_w
-                self.current_h = target_h
-                self.geometry(f"{int(target_w)}x{int(target_h)}+{curr_x}+{curr_y}")
-                if self.is_expanded:
-                    self.dashboard_frame.pack_forget()
-                self.is_expanded = not self.is_expanded
-                self.is_animating = False
-
-        step()
 
     # --- BACKGROUND SYNC ---
     def start_background_sync(self):
@@ -666,9 +629,9 @@ class DynamicIsland(ctk.CTk):
                 # 2. Weather every 15 mins (90 ticks)
                 if tick % 90 == 0:
                     w = get_weather(
-                        lat=self.config.get("weather", {}).get("latitude", -34.6037),
-                        lon=self.config.get("weather", {}).get("longitude", -58.3816),
-                        city_name=self.config.get("weather", {}).get("city", "Buenos Aires, Argentina")
+                        lat=self.config.get("weather", {}).get("latitude", -32.16145),
+                        lon=self.config.get("weather", {}).get("longitude", -63.4679),
+                        city_name=self.config.get("weather", {}).get("city", "James Craik, Córdoba")
                     )
                     self.after(0, lambda weather=w: self.apply_weather_update(weather))
 
@@ -748,7 +711,7 @@ class DynamicIsland(ctk.CTk):
             return
 
         for m in messages:
-            row = ctk.CTkFrame(self.slack_scroll, fg_color="#111824", corner_radius=8, border_color="#1c2638", border_width=1)
+            row = ctk.CTkFrame(self.slack_scroll, fg_color="#101520", corner_radius=8, border_color="#1a2332", border_width=1)
             row.pack(fill="x", pady=3, padx=2)
 
             top = ctk.CTkFrame(row, fg_color="transparent")
@@ -785,7 +748,7 @@ class DynamicIsland(ctk.CTk):
                 break
 
         for c in crons:
-            row = ctk.CTkFrame(self.crons_scroll, fg_color="#111824" if c != next_cron else "#16281e", corner_radius=6)
+            row = ctk.CTkFrame(self.crons_scroll, fg_color="#101520" if c != next_cron else "#16281e", corner_radius=6)
             row.pack(fill="x", pady=2, padx=2)
 
             is_done = c.get("done")
@@ -814,7 +777,7 @@ class DynamicIsland(ctk.CTk):
         repos = data.get("repos", [])
         if repos:
             for r in repos:
-                card = ctk.CTkFrame(self.gh_repos_box, fg_color="#111824", corner_radius=8, border_color="#1c2638", border_width=1)
+                card = ctk.CTkFrame(self.gh_repos_box, fg_color="#101520", corner_radius=8, border_color="#1a2332", border_width=1)
                 card.pack(fill="x", pady=3, padx=2)
 
                 top = ctk.CTkFrame(card, fg_color="transparent")
@@ -830,8 +793,8 @@ class DynamicIsland(ctk.CTk):
                     card,
                     text="Abrir Repositorio ↗",
                     font=("Segoe UI Variable Display", 10, "bold"),
-                    fg_color="#1c2636",
-                    hover_color="#28374d",
+                    fg_color="#1a2332",
+                    hover_color="#253247",
                     height=22,
                     corner_radius=4,
                     command=lambda u=r.get("url", "https://github.com/RanuK12"): webbrowser.open(u)
@@ -843,7 +806,7 @@ class DynamicIsland(ctk.CTk):
 
     def apply_weather_update(self, data):
         self.weather_data = data
-        city = data.get("city", "Buenos Aires, Argentina")
+        city = data.get("city", "James Craik, Córdoba")
         self.lbl_w_city.configure(text=f"📍 {city}")
 
         icon = data.get("icon", "⛅")
@@ -864,9 +827,9 @@ class DynamicIsland(ctk.CTk):
         for idx, day in enumerate(data.get("forecast", [])[:5]):
             card = ctk.CTkFrame(
                 self.forecast_grid,
-                fg_color="#121a28",
+                fg_color="#101520",
                 corner_radius=10,
-                border_color="#1f2c42",
+                border_color="#1a2332",
                 border_width=1,
                 height=130
             )
@@ -882,7 +845,7 @@ class DynamicIsland(ctk.CTk):
             )
             lbl_day.pack(fill="x", pady=(8, 2))
 
-            # Icon label (Fixed height = 36 to ensure equal spacing regardless of icon)
+            # Icon label (Fixed height = 36 to ensure equal vertical level)
             lbl_ico = ctk.CTkLabel(
                 card,
                 text=day.get("icon", "⛅"),
@@ -903,7 +866,7 @@ class DynamicIsland(ctk.CTk):
 
             # Rain badge (Fixed height)
             rain_p = day.get("rain_prob", 0)
-            rain_bg = "#182a40" if rain_p > 20 else "#141c28"
+            rain_bg = "#162334" if rain_p > 20 else "#0f1622"
             rain_col = "#58a6ff" if rain_p > 20 else "#8b949e"
             
             lbl_rain = ctk.CTkLabel(

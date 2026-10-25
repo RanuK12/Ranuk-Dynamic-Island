@@ -8,9 +8,9 @@
     "check_interval_seconds": 8
   },
   "weather": {
-    "city": "Buenos Aires, Argentina",
-    "latitude": -34.6037,
-    "longitude": -58.3816,
+    "city": "James Craik, Córdoba",
+    "latitude": -32.16145,
+    "longitude": -63.4679,
     "check_interval_seconds": 1200
   },
   "github": {
@@ -19,9 +19,9 @@
     "check_interval_seconds": 300
   },
   "ui": {
-    "theme": "dark_acrylic",
-    "collapsed_width": 330,
-    "collapsed_height": 42,
+    "theme": "pure_black_island",
+    "collapsed_width": 320,
+    "collapsed_height": 38,
     "expanded_width": 700,
     "expanded_height": 520,
     "stay_on_top": true,

@@ -40,7 +40,7 @@ WMO_CODES = {
 
 DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
-def get_weather(lat: float = -34.6037, lon: float = -58.3816, city_name: str = "Buenos Aires, Argentina") -> Dict[str, Any]:
+def get_weather(lat: float = -32.16145, lon: float = -63.4679, city_name: str = "James Craik, Córdoba") -> Dict[str, Any]:
     url = (
         f"https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,"
