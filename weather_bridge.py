@@ -1,12 +1,13 @@
 """
 Weather bridge for Dynamic Island
 Provides current weather + 5-day modern forecast using Open-Meteo.
+Includes automatic IP-based geolocator to detect your current city if you move/travel.
 """
 import sys
 import requests
 import json
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -40,7 +41,30 @@ WMO_CODES = {
 
 DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
-def get_weather(lat: float = -32.16145, lon: float = -63.4679, city_name: str = "James Craik, Córdoba") -> Dict[str, Any]:
+def detect_current_location() -> Tuple[float, float, str]:
+    """Detects current city and coordinates from IP (no API key required)."""
+    try:
+        r = requests.get(
+            "http://ip-api.com/json/?fields=status,city,regionName,country,lat,lon",
+            headers={"User-Agent": "IslandGeo/1.0"},
+            timeout=2.5
+        )
+        if r.status_code == 200:
+            d = r.json()
+            if d.get("status") == "success":
+                city = d.get("city", "James Craik")
+                region = d.get("regionName", "Córdoba")
+                return float(d.get("lat")), float(d.get("lon")), f"{city}, {region}"
+    except Exception:
+        pass
+    # Reliable default
+    return -32.16145, -63.4679, "James Craik, Córdoba"
+
+def get_weather(lat: float = None, lon: float = None, city_name: str = None) -> Dict[str, Any]:
+    # Auto-detect location if not provided or set to Auto
+    if lat is None or lon is None or not city_name or city_name == "Auto":
+        lat, lon, city_name = detect_current_location()
+
     url = (
         f"https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,"
@@ -96,6 +120,8 @@ def get_weather(lat: float = -32.16145, lon: float = -63.4679, city_name: str = 
             return {
                 "ok": True,
                 "city": city_name,
+                "lat": lat,
+                "lon": lon,
                 "temp": round(curr.get("temperature_2m", 20)),
                 "feels_like": round(curr.get("apparent_temperature", 20)),
                 "humidity": curr.get("relative_humidity_2m", 50),
@@ -108,12 +134,12 @@ def get_weather(lat: float = -32.16145, lon: float = -63.4679, city_name: str = 
                 "uv": today_uv,
                 "forecast": forecast
             }
-    except Exception as e:
+    except Exception:
         pass
     
     return {
         "ok": False,
-        "city": city_name,
+        "city": city_name or "James Craik, Córdoba",
         "temp": "--",
         "feels_like": "--",
         "humidity": "--",
@@ -129,6 +155,6 @@ def get_weather(lat: float = -32.16145, lon: float = -63.4679, city_name: str = 
 
 if __name__ == "__main__":
     w = get_weather()
-    print(w["city"], w["temp"], w["desc"])
-    for f in w.get("forecast", []):
-        print(f["day"], f["icon"], f"Máx: {f['max']}° Mín: {f['min']}° Lluvia: {f['rain_prob']}%")
+    print("Auto-detected City:", w["city"])
+    print("Coordinates:", w.get("lat"), w.get("lon"))
+    print("Conditions:", w["temp"], "°C", w["desc"])

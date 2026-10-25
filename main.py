@@ -626,12 +626,10 @@ class DynamicIsland(ctk.CTk):
                 mac = self.mac_bridge.fetch_full_status()
                 self.after(0, lambda m=mac: self.apply_mac_update(m))
 
-                # 2. Weather every 15 mins (90 ticks)
+                # 2. Weather (Auto-detects location wherever you are)
                 if tick % 90 == 0:
                     w = get_weather(
-                        lat=self.config.get("weather", {}).get("latitude", -32.16145),
-                        lon=self.config.get("weather", {}).get("longitude", -63.4679),
-                        city_name=self.config.get("weather", {}).get("city", "James Craik, Córdoba")
+                        city_name=self.config.get("weather", {}).get("city", "Auto")
                     )
                     self.after(0, lambda weather=w: self.apply_weather_update(weather))
 

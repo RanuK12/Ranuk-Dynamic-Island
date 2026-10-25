@@ -8,7 +8,7 @@
     "check_interval_seconds": 8
   },
   "weather": {
-    "city": "James Craik, Córdoba",
+    "city": "Auto",
     "latitude": -32.16145,
     "longitude": -63.4679,
     "check_interval_seconds": 1200
