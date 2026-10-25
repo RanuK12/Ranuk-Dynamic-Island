@@ -1,0 +1,20 @@
+{
+  "events": [
+    {
+      "time": "15:00",
+      "title": "Revisión bot Ranukita & Mac jobs",
+      "done": false
+    },
+    {
+      "time": "17:30",
+      "title": "Check de repositorios GitHub",
+      "done": false
+    },
+    {
+      "time": "19:00",
+      "title": "Seguimiento en LinkedIn",
+      "done": false
+    }
+  ],
+  "quick_notes": "Mini Oficina lista. Isla Dinámica operativa."
+}

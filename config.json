@@ -1,0 +1,30 @@
+{
+  "mac": {
+    "host": "192.168.1.34",
+    "user": "emilioranucoli",
+    "port": 22,
+    "bot_name": "ranukita",
+    "hub_url": "http://192.168.1.34:8788",
+    "check_interval_seconds": 10
+  },
+  "weather": {
+    "city": "Buenos Aires",
+    "latitude": -34.6037,
+    "longitude": -58.3816,
+    "check_interval_seconds": 1200
+  },
+  "github": {
+    "username": "RanuK12",
+    "token": "",
+    "check_interval_seconds": 300
+  },
+  "ui": {
+    "theme": "dark_acrylic",
+    "collapsed_width": 290,
+    "collapsed_height": 42,
+    "expanded_width": 640,
+    "expanded_height": 440,
+    "stay_on_top": true,
+    "show_in_taskbar": false
+  }
+}
