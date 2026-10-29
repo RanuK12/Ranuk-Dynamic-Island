@@ -15,7 +15,7 @@ It bridges your Windows workstation with your remote **MacBook Pro**, streaming 
 ## ✨ Key Highlights
 
 - **🍏 Apple Glassmorphism Aesthetic:** Translucent dark acrylic finish, rounded floating pill geometry, smooth easing transitions, and native Windows `Always-on-Top` docking.
-- **🤖 Ranuk Hub Live Telemetry:** Direct integration with [Ranuk Hub](http://192.168.1.34:8788/) (`ranuk.dev`), monitoring active microservices (`rk-agent-loop`, `rk-scan-server`, `rk-ollama-loop`, etc.), MacBook Pro battery percentage, and system uptime.
+- **🤖 Ranuk Hub Live Telemetry:** Direct integration with [Ranuk Hub](http://<MAC_IP>:8788/) (`ranuk.dev`), monitoring active microservices (`rk-agent-loop`, `rk-scan-server`, `rk-ollama-loop`, etc.), MacBook Pro battery percentage, and system uptime.
 - **💬 Autonomous Agent Slack Feed:** Live stream of executive messages and task proposals from `~/.ranukita/equipo_canal.jsonl` with avatar badges (`director_general`, `moltbot`, `procurement_apis`, `micro_monetizer`, `bounty-hunter`). Includes an interactive input bar to dispatch CEO directives directly from Windows.
 - **⏰ Daily Crons & Agenda:** Automatically discovers and tracks all 48+ scheduled daily calendar tasks from `~/Library/LaunchAgents/com.ranuk.*.plist`, visually flagging completed jobs (`✔`) and highlighting upcoming tasks (`⭐ PRÓXIMO`).
 - **🐙 GitHub Ecosystem (`RanuK12`):** Direct monitoring of public and private repository updates, stars, and languages for [github.com/RanuK12](https://github.com/RanuK12).
@@ -29,7 +29,7 @@ It bridges your Windows workstation with your remote **MacBook Pro**, streaming 
 
 ```mermaid
 flowchart TD
-    subgraph Mac["MacBook Pro (192.168.1.34)"]
+    subgraph Mac["MacBook Pro (<MAC_IP>)"]
         Hub["Ranuk Hub (:8788)\nranuk.dev"]
         Canal["Agent Slack Feed\n(~/.ranukita/equipo_canal.jsonl)"]
         Crons["48x macOS LaunchAgents\n(~/Library/LaunchAgents/com.ranuk.*)"]
@@ -100,11 +100,11 @@ chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
 ```json
 {
   "mac": {
-    "host": "192.168.1.34",
-    "user": "emilioranucoli",
+    "host": "<MAC_IP>",
+    "user": "<your-user>",
     "port": 22,
     "bot_name": "ranukita",
-    "hub_url": "http://192.168.1.34:8788",
+    "hub_url": "http://<MAC_IP>:8788",
     "check_interval_seconds": 8
   },
   "weather": {
